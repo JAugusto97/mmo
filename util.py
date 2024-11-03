@@ -195,11 +195,7 @@ def ml_smote(X, y, k=3, **kwargs):
 
             # Add synthetic sample to the dataset
             X_resampled.append(X_synthetic)
-
-            # Create the synthetic label with the current label active
-            y_synthetic = np.zeros(y.shape[1])
-            y_synthetic[label_idx] = 1
-            y_resampled.append(y_synthetic)
+            y_resampled.append(y[minority_indices[idx]])            
 
     return np.array(X_resampled), np.array(y_resampled)
 
