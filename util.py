@@ -72,7 +72,7 @@ def evaluate_multilabel(y_test, y_pred):
         'F-measure': fmeasure
     }
 
-def mmo(X, y):
+def mmo(X, y, **kwargs):
     selected_samples = []
     N, num_features = X.shape
     _, M = y.shape
@@ -136,7 +136,7 @@ def mmo(X, y):
 
     return X_resampled, y_resampled
 
-def random_oversample(X, Y, random_state=None):
+def random_oversample(X, Y, random_state=None, **kwargs):
     """
     Perform optimized random oversampling on a multilabel dataset.
     
@@ -188,10 +188,10 @@ def random_oversample(X, Y, random_state=None):
 
     return X_resampled, Y_resampled
 
-def no_oversample(X, y):
+def no_oversample(X, y, **kwargs):
     return X, y
 
-def ml_smote(X, y, k=3, n_samples=100):
+def ml_smote(X, y, k=3, n_samples=100, **kwargs):
     """
     Apply multilabel SMOTE to generate synthetic samples for a multilabel dataset.
 
@@ -247,7 +247,7 @@ def ml_smote(X, y, k=3, n_samples=100):
     
     return np.array(X_resampled), np.array(y_resampled)
 
-def mle_nn(X, y, k=3, threshold=0.5):
+def mle_nn(X, y, k=3, threshold=0.5, **kwargs):
     """
     Apply MLeNN (Multi-Label Edited Nearest Neighbor) algorithm to filter noisy instances.
 
@@ -296,7 +296,7 @@ def mle_nn(X, y, k=3, threshold=0.5):
     
     return X_filtered, y_filtered
 
-def ml_ros(X, y, target_proportion=1.0):
+def ml_ros(X, y, random_state, target_proportion=1.0, **kwargs):
     """
     Apply Multi-Label Random Over-Sampling (ML-ROS) to balance a multilabel dataset.
 
@@ -336,7 +336,7 @@ def ml_ros(X, y, target_proportion=1.0):
                     minority_indices,
                     n_samples=num_samples_needed,
                     replace=True,
-                    random_state=42
+                    random_state=random_state
                 )
                 # Add resampled instances to the data
                 for idx in samples_to_add:
@@ -345,7 +345,7 @@ def ml_ros(X, y, target_proportion=1.0):
 
     return np.array(X_resampled), np.array(y_resampled)
 
-def mmo_smote(X, y, k=3):
+def mmo_smote(X, y, k=3, **kwargs):
     selected_samples = []
     N, num_features = X.shape
     _, M = y.shape
@@ -421,7 +421,7 @@ def mmo_smote(X, y, k=3):
 
     return X_resampled, y_resampled
 
-def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5):
+def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5, **kwargs):
     selected_samples = []
     N, num_features = X.shape
     _, M = y.shape

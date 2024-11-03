@@ -64,7 +64,9 @@ def process_dataset_with_seed(dataset_name, data, oversampling_methods, seed):
     for oversample_name, oversample_func in oversampling_methods.items():
         print(f"Applying {oversample_name} oversampling for {dataset_name} with seed {seed}.")
         start_time_oversampling = time.time()
-        X_resampled, y_resampled = oversample_func(X_train, y_train)
+
+        kwargs = {"random_state": seed}
+        X_resampled, y_resampled = oversample_func(X_train, y_train, **kwargs)
         end_time_oversampling = time.time()
         
         classifier = LabelPowerset(classifier=RandomForestClassifier(n_estimators=100, random_state=seed))
