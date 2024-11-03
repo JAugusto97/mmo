@@ -1,7 +1,6 @@
 # util.py
 
 import numpy as np
-import pandas as pd
 import heapq
 from sklearn.utils import resample
 from sklearn.metrics import (
@@ -136,58 +135,6 @@ def mmo(X, y, **kwargs):
     y_resampled = np.concatenate((y, y_resampled), axis=0)
 
     return X_resampled, y_resampled
-
-
-def random_oversample(X, Y, random_state=None, **kwargs):
-    """
-    Perform optimized random oversampling on a multilabel dataset.
-
-    Parameters:
-    X (pd.DataFrame or np.ndarray): Feature matrix
-    Y (pd.DataFrame or np.ndarray): Multilabel binary matrix
-    random_state (int, optional): Random seed for reproducibility
-
-    Returns:
-    X_resampled (np.ndarray): Resampled feature matrix
-    Y_resampled (np.ndarray): Resampled multilabel matrix
-    """
-    # Ensure consistent DataFrame usage for easier operations
-    X_df = pd.DataFrame(X) if isinstance(X, np.ndarray) else X
-    Y_df = pd.DataFrame(Y) if isinstance(Y, np.ndarray) else Y
-
-    # Combine features and label combinations for grouping
-    data = X_df.copy()
-    data["label_combination"] = list(map(tuple, Y_df.values))
-
-    # Get counts for each label combination and the maximum count
-    label_counts = data["label_combination"].value_counts()
-    max_count = label_counts.max()
-
-    # Prepare a list to collect oversampled subsets
-    resampled_data = []
-
-    # Iterate over each unique label combination and resample if necessary
-    for label_combo, count in label_counts.items():
-        subset = data[data["label_combination"] == label_combo]
-        # Perform oversampling only if the count is below the maximum
-        if count < max_count:
-            oversampled_subset = resample(
-                subset, replace=True, n_samples=max_count, random_state=random_state
-            )
-            resampled_data.append(oversampled_subset)
-        else:
-            resampled_data.append(subset)
-
-    # Concatenate all resampled data
-    resampled_data = pd.concat(resampled_data, ignore_index=True)
-
-    # Separate back into features and labels without extra conversions
-    X_resampled = resampled_data.drop(columns=["label_combination"]).to_numpy()
-    Y_resampled = np.array(
-        [list(label) for label in resampled_data["label_combination"]]
-    )
-
-    return X_resampled, Y_resampled
 
 
 def no_oversample(X, y, **kwargs):
@@ -443,20 +390,16 @@ def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5, **kwargs):
     T = np.max(current_label_counts)
     samples_needed_per_label = T - current_label_counts
 
-    # List-based approach for resampled data
     X_resampled = []
     y_resampled = []
 
-    # Priority queue (max-heap) to store the best candidates
     candidate_heap = []
 
     sample_costs = np.zeros(N, dtype=int)
 
-    # Calculate nearest neighbors
     nbrs = NearestNeighbors(n_neighbors=k + 1).fit(X)
     distances, indices = nbrs.kneighbors(X)
 
-    # Helper function to calculate label consistency
     def label_consistency(sample_idx):
         neighbor_labels = y[indices[sample_idx]]
         consistency = (neighbor_labels * y[sample_idx]).sum(axis=1) / (
@@ -464,46 +407,37 @@ def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5, **kwargs):
         )
         return (consistency > consistency_threshold).mean()
 
-    # Initialize the heap with the initial scores and MLeNN criteria
     for i in range(N):
         sample_labels = y[i]
         contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
         consistency = label_consistency(i)
 
-        # Only consider samples with sufficient label consistency
         if contribution > 0 and consistency >= consistency_threshold:
             score = (contribution / (sample_costs[i] + 1)) * consistency
-            # Push negative score to simulate a max-heap
             heapq.heappush(candidate_heap, (-score, i))
 
     while np.any(current_label_counts < T):
         if not candidate_heap:
             break
 
-        # Select the best candidate
         best_score, best_idx = heapq.heappop(candidate_heap)
-        best_score = -best_score  # Revert score back to positive
+        best_score = -best_score
 
-        # Add the selected sample to the resampled dataset
         X_resampled.append(X[best_idx])
         y_resampled.append(y[best_idx])
 
-        # Update label counts and samples needed per label
         current_label_counts += y[best_idx]
         samples_needed_per_label = np.maximum(0, T - current_label_counts)
 
-        # Track sample costs to avoid redundant resampling
         sample_costs[best_idx] += 1
         selected_samples.append(best_idx)
 
-        # Update the contribution and score for the selected sample
         sample_labels = y[best_idx]
         contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
         consistency = label_consistency(best_idx)
 
         if contribution > 0 and consistency >= consistency_threshold:
             score = (contribution / (sample_costs[best_idx] + 1)) * consistency
-            # Push updated score and index back to the heap
             heapq.heappush(candidate_heap, (-score, best_idx))
 
     X_resampled = np.array(X_resampled)

@@ -9,7 +9,6 @@ from skmultilearn.dataset import load_dataset
 from util import (
     evaluate_multilabel,
     mmo,
-    random_oversample,
     no_oversample,
     ml_smote,
     mle_nn,
@@ -46,7 +45,6 @@ datasets = [
 ]
 
 oversampling_methods = {
-    "random": random_oversample,
     "none": no_oversample,
     "ml_smote": ml_smote,
     "mle_nn": mle_nn,
