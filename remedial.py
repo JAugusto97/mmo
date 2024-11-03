@@ -80,7 +80,7 @@ class REMEDIAL:
         return label_counts
 
 
-def remedial(X, y):
+def remedial(X, y, **kwargs):
     remedial = REMEDIAL(0.1)
     X_augmented, y_augmented = remedial.fit_transform(X, y)
     return X_augmented, y_augmented

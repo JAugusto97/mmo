@@ -214,7 +214,7 @@ class MLSOL:
         """
 
 
-def mlsol(X, y):
+def mlsol(X, y, **kwargs):
     mlsol = MLSOL(perc_gen_instances=1, k=3)
     X_aug, y_aug = mlsol.fit_resample(X, y)
 
