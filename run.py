@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from sklearn.ensemble import RandomForestClassifier
-from skmultilearn.problem_transform import LabelPowerset
+from skmultilearn.problem_transform import LabelPowerset, BinaryRelevance, ClassifierChain
 from skmultilearn.dataset import load_dataset
 
 from util import (
@@ -46,16 +46,20 @@ datasets = [
 oversampling_methods = {
     "none": no_oversample,
     "ml_smote": ml_smote,
-    "mle_nn": mle_nn,
     "ml_ros": ml_ros,
     "mmo": mmo,
     "mmo_smote": mmo_smote,
     "mmo_mle_nn": mmo_mle_nn,
 }
 
+classifier_dict = {
+    "BR-RF": BinaryRelevance(RandomForestClassifier(n_estimators=100)),
+    "CC-RF": ClassifierChain(RandomForestClassifier(n_estimators=100)),
+    "LP-RF": LabelPowerset(RandomForestClassifier(n_estimators=100)),
+}
 
-def process_dataset_with_seed(dataset_name, data, oversampling_methods, seed):
-    dataset_csv_path = f"datasets/{dataset_name}_results_seed_{seed}.csv"
+def process_dataset_with_seed(classifier_name, classifier, dataset_name, data, oversampling_methods, seed):
+    dataset_csv_path = f"datasets/{classifier_name}_{dataset_name}_results_seed_{seed}.csv"
 
     if os.path.exists(dataset_csv_path):
         return dataset_csv_path
@@ -81,8 +85,8 @@ def process_dataset_with_seed(dataset_name, data, oversampling_methods, seed):
         X_resampled, y_resampled = oversample_func(X_train, y_train, **kwargs)
         end_time_oversampling = time.time()
 
-        classifier = LabelPowerset(
-            classifier=RandomForestClassifier(n_estimators=100, random_state=seed)
+        print(
+            f"Training {classifier_name} for {dataset_name} with oversampling {oversample_name} with seed {seed}."
         )
         start_time_training = time.time()
         classifier.fit(X_resampled, y_resampled)
@@ -94,7 +98,7 @@ def process_dataset_with_seed(dataset_name, data, oversampling_methods, seed):
         row = {
             "Dataset": dataset_name,
             "Oversampling": oversample_name,
-            "Classifier": "RandomForest",
+            "Classifier": classifier_name,
             "Seed": seed,
             "Oversampling_Time_ms": (end_time_oversampling - start_time_oversampling)
             * 1000,
@@ -122,12 +126,15 @@ def run_experiment_parallel(data_dict, oversampling_methods, random_seeds):
         futures = [
             executor.submit(
                 process_dataset_with_seed,
+                classifier_name,
+                classifier,
                 dataset_name,
                 data,
                 oversampling_methods,
                 seed,
             )
             for dataset_name, data in data_dict.items()
+            for classifier_name, classifier in classifier_dict.items()
             for seed in random_seeds
         ]
 
@@ -147,15 +154,16 @@ def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
 
     for dataset_name, data in data_dict.items():
         for seed in random_seeds:
-            try:
-                dataset_csv_path = process_dataset_with_seed(
-                    dataset_name, data, oversampling_methods, seed
-                )
-                dataset_csv_paths.append(dataset_csv_path)
-                print(f"Completed processing for {dataset_csv_path}.")
+            for classifier_name, classifier in classifier_dict.items():
+                try:
+                    dataset_csv_path = process_dataset_with_seed(
+                        classifier_name, classifier, dataset_name, data, oversampling_methods, seed
+                    )
+                    dataset_csv_paths.append(dataset_csv_path)
+                    print(f"Completed processing for {dataset_csv_path}.")
 
-            except Exception as e:
-                print(f"Error processing {dataset_name} with seed {seed}: {e}")
+                except Exception as e:
+                    print(f"Error processing {dataset_name} with seed {seed}: {e}")
 
     combined_results = pd.concat([pd.read_csv(path) for path in dataset_csv_paths])
     combined_results.to_csv("datasets/consolidated_results.csv", index=False)
