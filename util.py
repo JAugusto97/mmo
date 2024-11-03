@@ -200,56 +200,6 @@ def ml_smote(X, y, k=3, **kwargs):
     return np.array(X_resampled), np.array(y_resampled)
 
 
-def mle_nn(X, y, k=3, threshold=0.5, **kwargs):
-    """
-    Apply MLeNN (Multi-Label Edited Nearest Neighbor) algorithm to filter noisy instances.
-
-    Parameters:
-    X : np.ndarray
-        The input feature matrix of shape (n_samples, n_features).
-    y : np.ndarray
-        The multilabel binary target matrix of shape (n_samples, n_classes).
-    k_neighbors : int, optional
-        Number of nearest neighbors to consider for label consistency.
-    threshold : float, optional
-        Proportion of neighbors that must share the label for an instance to be considered consistent.
-
-    Returns:
-    X_filtered : np.ndarray
-        The feature matrix after filtering.
-    y_filtered : np.ndarray
-        The target matrix after filtering.
-    """
-    nn_model = NearestNeighbors(n_neighbors=k + 1, metric="euclidean")
-    nn_model.fit(X)
-
-    # Find neighbors for each instance (excluding itself)
-    neighbors = nn_model.kneighbors(X, return_distance=False)[:, 1:]
-
-    # List to hold indices of instances to keep
-    keep_indices = []
-
-    for i, neighbor_indices in enumerate(neighbors):
-        # Get the labels of the neighbors
-        neighbor_labels = y[neighbor_indices]
-
-        # Calculate label consistency for each label
-        label_agreement = np.mean(neighbor_labels == y[i], axis=0)
-
-        # Check if the instance meets the consistency threshold for each label
-        consistent_labels = label_agreement >= threshold
-
-        # Keep the instance if it's consistent for the majority of its labels
-        if np.mean(consistent_labels) > threshold:
-            keep_indices.append(i)
-
-    # Filter the dataset to keep only the consistent instances
-    X_filtered = X[keep_indices]
-    y_filtered = y[keep_indices]
-
-    return X_filtered, y_filtered
-
-
 def ml_ros(X, y, random_state=None, target_proportion=1.0, **kwargs):
     """
     Apply Multi-Label Random Over-Sampling (ML-ROS) to balance a multilabel dataset.
