@@ -11,7 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 import time
 
 # Define random seeds for reproducibility
-random_seeds = [42, 24, 56, 78, 91, 35, 17, 83, 65, 12]
+random_seeds = list(range(1, 11))
 
 datasets = [
     'birds',
