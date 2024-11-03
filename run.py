@@ -60,7 +60,7 @@ def process_dataset_with_seed(
     classifier_name, classifier, dataset_name, data, oversampling_methods, seed
 ):
     dataset_csv_path = (
-        f"datasets/{classifier_name}_{dataset_name}_results_seed_{seed}.csv"
+        f"datasets/{dataset_name}_{classifier_name}_seed_{seed}.csv"
     )
 
     if os.path.exists(dataset_csv_path):
