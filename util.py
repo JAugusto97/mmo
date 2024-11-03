@@ -61,7 +61,6 @@ def evaluate_multilabel(y_test, y_pred):
     precision, recall, f1_per_label, _ = precision_recall_fscore_support(
         y_test, y_pred, average=None, zero_division=0
     )
-    fmeasure = f1_per_label.mean()
 
     return {
         "Hamming Loss": hamming,
@@ -69,7 +68,6 @@ def evaluate_multilabel(y_test, y_pred):
         "F1 Micro": f1_micro,
         "F1 Macro": f1_macro,
         "AUC-ROC": roc_auc,
-        "F-measure": fmeasure,
     }
 
 
@@ -195,7 +193,7 @@ def ml_smote(X, y, k=3, **kwargs):
 
             # Add synthetic sample to the dataset
             X_resampled.append(X_synthetic)
-            y_resampled.append(y[minority_indices[idx]])            
+            y_resampled.append(y[minority_indices[idx]])
 
     return np.array(X_resampled), np.array(y_resampled)
 

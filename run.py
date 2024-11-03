@@ -3,7 +3,11 @@ import numpy as np
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from sklearn.ensemble import RandomForestClassifier
-from skmultilearn.problem_transform import LabelPowerset, BinaryRelevance, ClassifierChain
+from skmultilearn.problem_transform import (
+    LabelPowerset,
+    BinaryRelevance,
+    ClassifierChain,
+)
 from skmultilearn.dataset import load_dataset
 
 from util import (
@@ -58,8 +62,13 @@ classifier_dict = {
     "LP-RF": LabelPowerset(RandomForestClassifier(n_estimators=100)),
 }
 
-def process_dataset_with_seed(classifier_name, classifier, dataset_name, data, oversampling_methods, seed):
-    dataset_csv_path = f"datasets/{classifier_name}_{dataset_name}_results_seed_{seed}.csv"
+
+def process_dataset_with_seed(
+    classifier_name, classifier, dataset_name, data, oversampling_methods, seed
+):
+    dataset_csv_path = (
+        f"datasets/{classifier_name}_{dataset_name}_results_seed_{seed}.csv"
+    )
 
     if os.path.exists(dataset_csv_path):
         return dataset_csv_path
@@ -122,7 +131,7 @@ def process_dataset_with_seed(classifier_name, classifier, dataset_name, data, o
 
 def run_experiment_parallel(data_dict, oversampling_methods, random_seeds):
     dataset_csv_paths = []
-    with ProcessPoolExecutor(max_workers=4) as executor:
+    with ProcessPoolExecutor(max_workers=8) as executor:
         futures = [
             executor.submit(
                 process_dataset_with_seed,
@@ -157,7 +166,12 @@ def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
             for classifier_name, classifier in classifier_dict.items():
                 try:
                     dataset_csv_path = process_dataset_with_seed(
-                        classifier_name, classifier, dataset_name, data, oversampling_methods, seed
+                        classifier_name,
+                        classifier,
+                        dataset_name,
+                        data,
+                        oversampling_methods,
+                        seed,
                     )
                     dataset_csv_paths.append(dataset_csv_path)
                     print(f"Completed processing for {dataset_csv_path}.")
