@@ -1,3 +1,4 @@
+import argparse
 import os
 import numpy as np
 import pandas as pd
@@ -20,6 +21,7 @@ from util import (
     mean_imbalance_ratio,
 )
 from mlcsmote import mlcsmote
+from mlsol import mlsol
 from sklearn.preprocessing import MinMaxScaler
 import time
 
@@ -53,6 +55,7 @@ oversampling_methods = {
     "mmo": mmo,
     "mmo_smote": mmo_smote,
     "mlcsmote": mlcsmote,
+    "mlsol": mlsol
 }
 
 
@@ -124,7 +127,6 @@ def process_dataset_with_seed(
 
 def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
     dataset_csv_paths = []
-
     for dataset_name, data in data_dict.items():
         for seed in random_seeds:
             classifier_dict = {
@@ -161,6 +163,19 @@ def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run multilabel oversampling experiment.")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="all",
+        help="Specify the dataset to process. Use 'all' to process all datasets."
+    )
+    args = parser.parse_args()
+
+    selected_datasets = (
+        datasets if args.dataset == "all" else [args.dataset]
+    )
+
     data_dict = {}
     for dataset in datasets:
         try:
