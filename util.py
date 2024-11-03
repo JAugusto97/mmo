@@ -278,7 +278,7 @@ def mmo_smote(X, y, k=3, **kwargs):
             heapq.heappush(candidate_heap, (-score, i))
 
     # Set up nearest neighbor model for SMOTE-style interpolation
-    nn = NearestNeighbors(n_neighbors=k + 1, metric="euclidean").fit(
+    nn = NearestNeighbors(n_neighbors=k + 1).fit(
         X
     )  # k+1 to include the sample itself
 
@@ -291,7 +291,7 @@ def mmo_smote(X, y, k=3, **kwargs):
         best_score = -best_score  # Revert score back to positive
 
         # Find the k nearest neighbors for the selected sample (excluding itself)
-        _, indices = nn.kneighbors(X[best_idx].reshape(1, -1))
+        indices = nn.kneighbors(X[best_idx].reshape(1, -1), return_distance=False)
         neighbor_indices = indices[0][1:]  # Exclude the sample itself
 
         # Generate a synthetic sample with a random neighbor
@@ -346,7 +346,7 @@ def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5, **kwargs):
     sample_costs = np.zeros(N, dtype=int)
 
     nbrs = NearestNeighbors(n_neighbors=k + 1).fit(X)
-    distances, indices = nbrs.kneighbors(X)
+    indices = nbrs.kneighbors(X, return_distance=False)
 
     def label_consistency(sample_idx):
         neighbor_labels = y[indices[sample_idx]]
