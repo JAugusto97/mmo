@@ -251,37 +251,37 @@ def ml_ros(X, y, random_state=None, target_proportion=1.0, **kwargs):
 
 
 def mmo_smote(X, y, k=3, **kwargs):
-    selected_samples = []
     N, num_features = X.shape
     _, M = y.shape
 
+    # Calculate target samples needed per label
     current_label_counts = np.sum(y, axis=0)
     T = np.max(current_label_counts)
     samples_needed_per_label = T - current_label_counts
 
-    # List-based approach for resampled data
+    # Resampled data storage
     X_resampled = []
     y_resampled = []
-
-    # Priority queue (max-heap) to store the best candidates
+    selected_samples = []
     candidate_heap = []
-
     sample_costs = np.zeros(N, dtype=int)
 
-    # Initialize the heap with the initial scores
+    # Initialize label-wise KNN models
+    knn_models = {}
+    for label in range(M):
+        label_indices = np.where(y[:, label] == 1)[0]
+        if len(label_indices) > k:
+            knn_models[label] = NearestNeighbors(n_neighbors=k + 1).fit(X[label_indices])
+
+    # Initialize the heap with initial scores
     for i in range(N):
         sample_labels = y[i]
         contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
         if contribution > 0:
             score = contribution / (sample_costs[i] + 1)
-            # Push negative score to simulate a max-heap
             heapq.heappush(candidate_heap, (-score, i))
 
-    # Set up nearest neighbor model for SMOTE-style interpolation
-    nn = NearestNeighbors(n_neighbors=k + 1).fit(
-        X
-    )  # k+1 to include the sample itself
-
+    # Main loop to generate samples
     while np.any(current_label_counts < T):
         if not candidate_heap:
             break
@@ -289,108 +289,44 @@ def mmo_smote(X, y, k=3, **kwargs):
         # Select the best candidate
         best_score, best_idx = heapq.heappop(candidate_heap)
         best_score = -best_score  # Revert score back to positive
-
-        # Find the k nearest neighbors for the selected sample (excluding itself)
-        indices = nn.kneighbors(X[best_idx].reshape(1, -1), return_distance=False)
-        neighbor_indices = indices[0][1:]  # Exclude the sample itself
-
-        # Generate a synthetic sample with a random neighbor
-        neighbor_idx = np.random.choice(neighbor_indices)
-        lam = np.random.rand()
-        X_synthetic = X[best_idx] + lam * (X[neighbor_idx] - X[best_idx])
-
-        X_resampled.append(X_synthetic)
-        y_resampled.append(y[best_idx])  # Label remains the same as the original sample
-
-        # Update label counts and samples needed per label
-        current_label_counts += y[best_idx]
-        samples_needed_per_label = np.maximum(0, T - current_label_counts)
-
-        # Track sample costs to avoid redundant resampling
-        sample_costs[best_idx] += 1
-        selected_samples.append(best_idx)
-
-        # Update the contribution and score for the selected sample if still needed
         sample_labels = y[best_idx]
+
+        # Generate synthetic samples for each label that still needs samples
+        for label in range(M):
+            if sample_labels[label] == 1 and label in knn_models:
+                label_indices = np.where(y[:, label] == 1)[0]
+                if best_idx not in label_indices:
+                    continue
+
+                # Find neighbors within the same label subset
+                nn = knn_models[label]
+                indices = nn.kneighbors(X[best_idx].reshape(1, -1), return_distance=False)
+                neighbor_indices = indices[0][1:]  # Exclude itself
+
+                # Generate synthetic sample if there are valid neighbors
+                if neighbor_indices.size > 0:
+                    neighbor_idx = np.random.choice(neighbor_indices)
+                    lam = np.random.rand()
+                    X_synthetic = X[best_idx] + lam * (X[neighbor_idx] - X[best_idx])
+
+                    X_resampled.append(X_synthetic)
+                    y_resampled.append(sample_labels)  # Retain the original labels
+
+                    # Update counts and track usage
+                    current_label_counts += sample_labels
+                    samples_needed_per_label = np.maximum(0, T - current_label_counts)
+                    sample_costs[best_idx] += 1
+                    selected_samples.append(best_idx)
+
+        # Recalculate the score for the selected sample if still needed
         contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
         if contribution > 0:
             score = contribution / (sample_costs[best_idx] + 1)
-            # Push updated score and index back to the heap
             heapq.heappush(candidate_heap, (-score, best_idx))
 
-    # Convert resampled lists to arrays
+    # Convert lists to arrays and concatenate with original data
     X_resampled = np.array(X_resampled)
     y_resampled = np.array(y_resampled)
-
-    # Concatenate the original dataset with the synthetic samples
-    X_resampled = np.concatenate((X, X_resampled), axis=0)
-    y_resampled = np.concatenate((y, y_resampled), axis=0)
-
-    return X_resampled, y_resampled
-
-
-def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5, **kwargs):
-    selected_samples = []
-    N, num_features = X.shape
-    _, M = y.shape
-
-    current_label_counts = np.sum(y, axis=0)
-    T = np.max(current_label_counts)
-    samples_needed_per_label = T - current_label_counts
-
-    X_resampled = []
-    y_resampled = []
-
-    candidate_heap = []
-
-    sample_costs = np.zeros(N, dtype=int)
-
-    nbrs = NearestNeighbors(n_neighbors=k + 1).fit(X)
-    indices = nbrs.kneighbors(X, return_distance=False)
-
-    def label_consistency(sample_idx):
-        neighbor_labels = y[indices[sample_idx]]
-        consistency = (neighbor_labels * y[sample_idx]).sum(axis=1) / (
-            y[sample_idx].sum() + 1
-        )
-        return (consistency > consistency_threshold).mean()
-
-    for i in range(N):
-        sample_labels = y[i]
-        contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
-        consistency = label_consistency(i)
-
-        if contribution > 0 and consistency >= consistency_threshold:
-            score = (contribution / (sample_costs[i] + 1)) * consistency
-            heapq.heappush(candidate_heap, (-score, i))
-
-    while np.any(current_label_counts < T):
-        if not candidate_heap:
-            break
-
-        best_score, best_idx = heapq.heappop(candidate_heap)
-        best_score = -best_score
-
-        X_resampled.append(X[best_idx])
-        y_resampled.append(y[best_idx])
-
-        current_label_counts += y[best_idx]
-        samples_needed_per_label = np.maximum(0, T - current_label_counts)
-
-        sample_costs[best_idx] += 1
-        selected_samples.append(best_idx)
-
-        sample_labels = y[best_idx]
-        contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
-        consistency = label_consistency(best_idx)
-
-        if contribution > 0 and consistency >= consistency_threshold:
-            score = (contribution / (sample_costs[best_idx] + 1)) * consistency
-            heapq.heappush(candidate_heap, (-score, best_idx))
-
-    X_resampled = np.array(X_resampled)
-    y_resampled = np.array(y_resampled)
-
     X_resampled = np.concatenate((X, X_resampled), axis=0)
     y_resampled = np.concatenate((y, y_resampled), axis=0)
 
