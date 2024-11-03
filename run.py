@@ -16,10 +16,10 @@ from util import (
     ml_smote,
     ml_ros,
     mmo_smote,
-    mmo_mle_nn,
     label_density,
     mean_imbalance_ratio,
 )
+from mlcsmote import mlcsmote
 from sklearn.preprocessing import MinMaxScaler
 import time
 
@@ -52,7 +52,7 @@ oversampling_methods = {
     "ml_ros": ml_ros,
     "mmo": mmo,
     "mmo_smote": mmo_smote,
-    "mmo_mle_nn": mmo_mle_nn,
+    "mlcsmote": mlcsmote,
 }
 
 

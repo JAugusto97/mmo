@@ -4,3 +4,4 @@ numpy
 scikit-multilearn
 arff
 requests
+scikit-posthocs
