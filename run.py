@@ -22,6 +22,7 @@ from util import (
 )
 from mlcsmote import mlcsmote
 from mlsol import mlsol
+from remedial import remedial
 from sklearn.preprocessing import MinMaxScaler
 import time
 
@@ -55,7 +56,8 @@ oversampling_methods = {
     "mmo": mmo,
     "mmo_smote": mmo_smote,
     "mlcsmote": mlcsmote,
-    "mlsol": mlsol
+    "mlsol": mlsol,
+    "remedial": remedial,
 }
 
 
