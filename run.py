@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import pandas as pd
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from sklearn.ensemble import RandomForestClassifier
 from skmultilearn.problem_transform import (
     LabelPowerset,
@@ -54,12 +53,6 @@ oversampling_methods = {
     "mmo": mmo,
     "mmo_smote": mmo_smote,
     "mmo_mle_nn": mmo_mle_nn,
-}
-
-classifier_dict = {
-    "BR-RF": BinaryRelevance(RandomForestClassifier(n_estimators=100)),
-    "CC-RF": ClassifierChain(RandomForestClassifier(n_estimators=100)),
-    "LP-RF": LabelPowerset(RandomForestClassifier(n_estimators=100)),
 }
 
 
@@ -129,40 +122,22 @@ def process_dataset_with_seed(
     return dataset_csv_path
 
 
-def run_experiment_parallel(data_dict, oversampling_methods, random_seeds):
-    dataset_csv_paths = []
-    with ProcessPoolExecutor(max_workers=8) as executor:
-        futures = [
-            executor.submit(
-                process_dataset_with_seed,
-                classifier_name,
-                classifier,
-                dataset_name,
-                data,
-                oversampling_methods,
-                seed,
-            )
-            for dataset_name, data in data_dict.items()
-            for classifier_name, classifier in classifier_dict.items()
-            for seed in random_seeds
-        ]
-
-        for future in as_completed(futures):
-            dataset_csv_path = future.result()
-            dataset_csv_paths.append(dataset_csv_path)
-            print(f"Completed processing for {dataset_csv_path}.")
-
-    combined_results = pd.concat([pd.read_csv(path) for path in dataset_csv_paths])
-    combined_results.to_csv("datasets/consolidated_results.csv", index=False)
-    print("\nConsolidated results saved to 'consolidated_results.csv'.")
-    return combined_results
-
-
 def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
     dataset_csv_paths = []
 
     for dataset_name, data in data_dict.items():
         for seed in random_seeds:
+            classifier_dict = {
+                "BR-RF": BinaryRelevance(
+                    RandomForestClassifier(n_estimators=100, random_state=seed)
+                ),
+                "CC-RF": ClassifierChain(
+                    RandomForestClassifier(n_estimators=100, random_state=seed)
+                ),
+                "LP-RF": LabelPowerset(
+                    RandomForestClassifier(n_estimators=100, random_state=seed)
+                ),
+            }
             for classifier_name, classifier in classifier_dict.items():
                 try:
                     dataset_csv_path = process_dataset_with_seed(
