@@ -141,9 +141,9 @@ def no_oversample(X, y, **kwargs):
     return X, y
 
 
-def ml_smote(X, y, k=3, n_samples=100, **kwargs):
+def ml_smote(X, y, k=3, **kwargs):
     """
-    Apply multilabel SMOTE to generate synthetic samples for a multilabel dataset.
+    Apply multilabel SMOTE to generate synthetic samples for a multilabel dataset to achieve balanced classes.
 
     Parameters:
     X : np.ndarray
@@ -152,8 +152,6 @@ def ml_smote(X, y, k=3, n_samples=100, **kwargs):
         The multilabel binary target matrix of shape (n_samples, n_classes).
     k : int, optional
         Number of nearest neighbors to consider for synthetic sample generation.
-    n_samples : int, optional
-        Number of synthetic samples to generate.
 
     Returns:
     X_resampled : np.ndarray
@@ -162,6 +160,11 @@ def ml_smote(X, y, k=3, n_samples=100, **kwargs):
         The resampled target matrix including synthetic samples.
     """
     X_resampled, y_resampled = list(X), list(y)
+
+    # Determine the number of samples needed for each label to achieve balance
+    label_counts = np.sum(y, axis=0)
+    max_count = np.max(label_counts)
+    samples_needed_per_label = max_count - label_counts
 
     for label_idx in range(y.shape[1]):
         # Identify samples for the current label
@@ -179,7 +182,8 @@ def ml_smote(X, y, k=3, n_samples=100, **kwargs):
         nn_model.fit(X_minority)
         neighbors = nn_model.kneighbors(X_minority, return_distance=False)[:, 1:]
 
-        for _ in range(n_samples // y.shape[1]):
+        # Generate enough synthetic samples to balance this label
+        for _ in range(samples_needed_per_label[label_idx]):
             idx = np.random.choice(len(X_minority))
             neighbor_idx = np.random.choice(neighbors[idx])
 
@@ -250,7 +254,7 @@ def mle_nn(X, y, k=3, threshold=0.5, **kwargs):
     return X_filtered, y_filtered
 
 
-def ml_ros(X, y, random_state, target_proportion=1.0, **kwargs):
+def ml_ros(X, y, random_state=None, target_proportion=1.0, **kwargs):
     """
     Apply Multi-Label Random Over-Sampling (ML-ROS) to balance a multilabel dataset.
 
