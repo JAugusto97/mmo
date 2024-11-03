@@ -9,25 +9,23 @@ import pandas as pd
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.linear_model import SGDClassifier
+from sklearn.cluster import KMeans
+from collections import Counter
 
+import math
 import random
 import warnings
-
-warnings.filterwarnings("ignore")
-
 
 from sklearn.metrics import (
     f1_score,
     hamming_loss,
     label_ranking_average_precision_score,
     zero_one_loss,
-    auc,
     coverage_error,
 )
 
 
-"""
-"""
+warnings.filterwarnings("ignore")
 
 
 def batchkmeans_cluster(D, clust_num):
@@ -82,10 +80,6 @@ def clusterDistance(cluster_centers, X_min, cluster_labels, targetCluster=0):
     return np.mean(distS), tmp
 
 
-from sklearn.cluster import KMeans
-from collections import Counter
-
-
 def cluster(X_max, X_min, y, clust_num, min_all_dict, cluster_matrix):
     # print (X_min)
     kmeans = KMeans(n_clusters=clust_num, random_state=0).fit(X_min)
@@ -94,7 +88,6 @@ def cluster(X_max, X_min, y, clust_num, min_all_dict, cluster_matrix):
     max_labels = kmeans.predict(X_max)
     max_label_counterDict = Counter((max_labels))
 
-    z = 1
     label_counterDict = Counter((cluster_labels))
     label_counter = []
     max_label_counter = []
@@ -134,7 +127,6 @@ def cluster(X_max, X_min, y, clust_num, min_all_dict, cluster_matrix):
                         v.add(min_all_dict[ci])
                         cluster_matrix[min_all_dict[cj]] = v
 
-    z = 1
     return (
         cluster_avgDistance,
         label_counter,
@@ -146,7 +138,6 @@ def cluster(X_max, X_min, y, clust_num, min_all_dict, cluster_matrix):
 
 def cluster_score_computer(cluster_avgDistance, label_counter, max_label_counterDict):
     # 单拉出来 看看
-    cluster_score = []
     SF = []
     for ii in range(0, len(cluster_avgDistance)):
         if cluster_avgDistance[ii] == 0:  #
@@ -167,8 +158,6 @@ def LIFT(X, Y, Xt, Yt, ratio):
     centroids_per_label = {}
     for label in range(Y.shape[1]):
         print(label)
-        if label == 2:
-            z = 1
         positive_instances = []
         negative_instances = []
         ylabel = []
@@ -224,9 +213,6 @@ def LIFT(X, Y, Xt, Yt, ratio):
         + "\t"
         + str((f1_score(Yt, results.values, average="micro")))
     )
-
-
-import math
 
 
 def LIFT_WEIGHT(X, Y, ratio):
@@ -317,7 +303,6 @@ def LIFT_WEIGHT(X, Y, ratio):
         sample_total_weight2.append(tmp)
     sample_total_weight2 = sample_total_weight2 / np.sum(sample_total_weight2)
     label_cluster_matrix = cluster_matrix
-    z = 1
     return sample_total_weight2, label_cluster_matrix
 
 
@@ -360,12 +345,9 @@ def lift(X, Y, r=0.2, K=3, perc_gen_instances=1):
     X_mlsmote = list(X_train)
     Y_mlsmote = list(y_train)
 
-    all_bag = list(range(len(Y)))
     X_syn = []
     synset = set()
     for i in range(0, gen_num):
-        if i == 5:
-            z = 1
         seed_index = get_seed_instance(sample_total_weight)
 
         x_seed = X[seed_index]
@@ -376,8 +358,6 @@ def lift(X, Y, r=0.2, K=3, perc_gen_instances=1):
         reference_index = indices[seed_index]
         check_reference = []
         for r in reference_index:
-            if r not in label_cluster_matrix[seed_index]:
-                z = 1
             if r in label_cluster_matrix[seed_index]:
                 check_reference.append(r)
         if seed_index in check_reference:
