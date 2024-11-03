@@ -20,7 +20,7 @@ from util import (
     label_density,
     mean_imbalance_ratio,
 )
-from mlcsmote import mlcsmote
+from lift import lift
 from mlsol import mlsol
 from remedial import remedial
 from sklearn.preprocessing import MinMaxScaler
@@ -55,7 +55,7 @@ oversampling_methods = {
     "ml_ros": ml_ros,
     "mmo": mmo,
     "mmo_smote": mmo_smote,
-    "mlcsmote": mlcsmote,
+    "lift": lift,
     "mlsol": mlsol,
     "remedial": remedial,
 }
