@@ -16,6 +16,39 @@ from sklearn.metrics import (
 from sklearn.neighbors import NearestNeighbors
 import time
 
+def label_density(y):
+    """
+    Calculate the Label Density of a multilabel dataset.
+
+    Parameters:
+    y (numpy.ndarray): Binary matrix of shape (n_samples, n_labels).
+
+    Returns:
+    float: Label Density.
+    """
+    n_samples, n_labels = y.shape
+    label_cardinality = np.sum(y) / n_samples
+    label_density = label_cardinality / n_labels
+    return label_density
+
+def mean_imbalance_ratio(y):
+    """
+    Calculate the Mean Imbalance Ratio (MeanIR) of a multilabel dataset.
+
+    Parameters:
+    y (numpy.ndarray): Binary matrix of shape (n_samples, n_labels).
+
+    Returns:
+    float: Mean Imbalance Ratio.
+    """
+    n_samples, n_labels = y.shape
+    label_frequencies = np.sum(y, axis=0)
+    max_frequency = np.max(label_frequencies)
+    imbalance_ratios = max_frequency / label_frequencies
+    mean_ir = np.mean(imbalance_ratios)
+    return mean_ir
+
+
 def evaluate_multilabel(y_test, y_pred):
     hamming = hamming_loss(y_test, y_pred)
     accuracy = accuracy_score(y_test, y_pred)
@@ -155,7 +188,7 @@ def random_oversample(X, Y, random_state=None):
 def no_oversample(X, y):
     return X, y
 
-def ml_smote(X, y, k_neighbors=5, n_samples=100):
+def ml_smote(X, y, k=3, n_samples=100):
     """
     Apply multilabel SMOTE to generate synthetic samples for a multilabel dataset.
 
@@ -164,7 +197,7 @@ def ml_smote(X, y, k_neighbors=5, n_samples=100):
         The input feature matrix of shape (n_samples, n_features).
     y : np.ndarray
         The multilabel binary target matrix of shape (n_samples, n_classes).
-    k_neighbors : int, optional
+    k : int, optional
         Number of nearest neighbors to consider for synthetic sample generation.
     n_samples : int, optional
         Number of synthetic samples to generate.
@@ -189,7 +222,7 @@ def ml_smote(X, y, k_neighbors=5, n_samples=100):
         X_minority = X[minority_indices]
         
         # Fit the nearest neighbors model
-        nn_model = NearestNeighbors(n_neighbors=k_neighbors + 1)
+        nn_model = NearestNeighbors(n_neighbors=k+1, metric='euclidean')
         nn_model.fit(X_minority)
         neighbors = nn_model.kneighbors(X_minority, return_distance=False)[:, 1:]
         
@@ -210,3 +243,252 @@ def ml_smote(X, y, k_neighbors=5, n_samples=100):
             y_resampled.append(y_synthetic)
     
     return np.array(X_resampled), np.array(y_resampled)
+
+def mle_nn(X, y, k=3, threshold=0.5):
+    """
+    Apply MLeNN (Multi-Label Edited Nearest Neighbor) algorithm to filter noisy instances.
+
+    Parameters:
+    X : np.ndarray
+        The input feature matrix of shape (n_samples, n_features).
+    y : np.ndarray
+        The multilabel binary target matrix of shape (n_samples, n_classes).
+    k_neighbors : int, optional
+        Number of nearest neighbors to consider for label consistency.
+    threshold : float, optional
+        Proportion of neighbors that must share the label for an instance to be considered consistent.
+
+    Returns:
+    X_filtered : np.ndarray
+        The feature matrix after filtering.
+    y_filtered : np.ndarray
+        The target matrix after filtering.
+    """
+    nn_model = NearestNeighbors(n_neighbors=k+1, metric='euclidean')
+    nn_model.fit(X)
+    
+    # Find neighbors for each instance (excluding itself)
+    neighbors = nn_model.kneighbors(X, return_distance=False)[:, 1:]
+    
+    # List to hold indices of instances to keep
+    keep_indices = []
+    
+    for i, neighbor_indices in enumerate(neighbors):
+        # Get the labels of the neighbors
+        neighbor_labels = y[neighbor_indices]
+        
+        # Calculate label consistency for each label
+        label_agreement = np.mean(neighbor_labels == y[i], axis=0)
+        
+        # Check if the instance meets the consistency threshold for each label
+        consistent_labels = label_agreement >= threshold
+        
+        # Keep the instance if it's consistent for the majority of its labels
+        if np.mean(consistent_labels) > threshold:
+            keep_indices.append(i)
+    
+    # Filter the dataset to keep only the consistent instances
+    X_filtered = X[keep_indices]
+    y_filtered = y[keep_indices]
+    
+    return X_filtered, y_filtered
+
+def ml_ros(X, y, target_proportion=1.0):
+    """
+    Apply Multi-Label Random Over-Sampling (ML-ROS) to balance a multilabel dataset.
+
+    Parameters:
+    X : np.ndarray
+        The input feature matrix of shape (n_samples, n_features).
+    y : np.ndarray
+        The multilabel binary target matrix of shape (n_samples, n_classes).
+    target_proportion : float, optional
+        The target frequency proportion of each label relative to the majority label.
+
+    Returns:
+    X_resampled : np.ndarray
+        The resampled feature matrix after applying ML-ROS.
+    y_resampled : np.ndarray
+        The resampled target matrix after applying ML-ROS.
+    """
+    # Calculate label frequencies
+    label_counts = np.sum(y, axis=0)
+    max_count = np.max(label_counts)
+    target_counts = (target_proportion * max_count).astype(int)
+
+    # Initialize resampled data
+    X_resampled, y_resampled = list(X), list(y)
+
+    for label_idx in range(y.shape[1]):
+        if label_counts[label_idx] < target_counts:
+            # Find instances with this label
+            minority_indices = np.where(y[:, label_idx] == 1)[0]
+            # Determine the number of samples needed
+            num_samples_needed = target_counts - label_counts[label_idx]
+            # Randomly sample with replacement
+            samples_to_add = resample(
+                minority_indices,
+                n_samples=num_samples_needed,
+                replace=True,
+                random_state=42
+            )
+            # Add resampled instances to the data
+            for idx in samples_to_add:
+                X_resampled.append(X[idx])
+                y_resampled.append(y[idx])
+
+    return np.array(X_resampled), np.array(y_resampled)
+
+def mmo_smote(X, y, k=3):
+    selected_samples = []
+    N, num_features = X.shape
+    _, M = y.shape
+
+    current_label_counts = np.sum(y, axis=0)
+    T = np.max(current_label_counts)
+    samples_needed_per_label = T - current_label_counts
+
+    # List-based approach for resampled data
+    X_resampled = []
+    y_resampled = []
+
+    # Priority queue (max-heap) to store the best candidates
+    candidate_heap = []
+
+    sample_costs = np.zeros(N, dtype=int)
+    
+    # Initialize the heap with the initial scores
+    for i in range(N):
+        sample_labels = y[i]
+        contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
+        if contribution > 0:
+            score = contribution / (sample_costs[i] + 1)
+            # Push negative score to simulate a max-heap
+            heapq.heappush(candidate_heap, (-score, i))
+
+    # Set up nearest neighbor model for SMOTE-style interpolation
+    nn = NearestNeighbors(n_neighbors=k + 1, metric='euclidean').fit(X)  # k+1 to include the sample itself
+
+    while np.any(current_label_counts < T):
+        if not candidate_heap:
+            break
+
+        # Select the best candidate
+        best_score, best_idx = heapq.heappop(candidate_heap)
+        best_score = -best_score  # Revert score back to positive
+
+        # Find the k nearest neighbors for the selected sample (excluding itself)
+        _, indices = nn.kneighbors(X[best_idx].reshape(1, -1))
+        neighbor_indices = indices[0][1:]  # Exclude the sample itself
+
+        # Generate a synthetic sample with a random neighbor
+        neighbor_idx = np.random.choice(neighbor_indices)
+        lam = np.random.rand()
+        X_synthetic = X[best_idx] + lam * (X[neighbor_idx] - X[best_idx])
+        
+        X_resampled.append(X_synthetic)
+        y_resampled.append(y[best_idx])  # Label remains the same as the original sample
+
+        # Update label counts and samples needed per label
+        current_label_counts += y[best_idx]
+        samples_needed_per_label = np.maximum(0, T - current_label_counts)
+        
+        # Track sample costs to avoid redundant resampling
+        sample_costs[best_idx] += 1
+        selected_samples.append(best_idx)
+
+        # Update the contribution and score for the selected sample if still needed
+        sample_labels = y[best_idx]
+        contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
+        if contribution > 0:
+            score = contribution / (sample_costs[best_idx] + 1)
+            # Push updated score and index back to the heap
+            heapq.heappush(candidate_heap, (-score, best_idx))
+
+    # Convert resampled lists to arrays
+    X_resampled = np.array(X_resampled)
+    y_resampled = np.array(y_resampled)
+
+    # Concatenate the original dataset with the synthetic samples
+    X_resampled = np.concatenate((X, X_resampled), axis=0)
+    y_resampled = np.concatenate((y, y_resampled), axis=0)
+
+    return X_resampled, y_resampled
+
+def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5):
+    selected_samples = []
+    N, num_features = X.shape
+    _, M = y.shape
+
+    current_label_counts = np.sum(y, axis=0)
+    T = np.max(current_label_counts)
+    samples_needed_per_label = T - current_label_counts
+
+    # List-based approach for resampled data
+    X_resampled = []
+    y_resampled = []
+
+    # Priority queue (max-heap) to store the best candidates
+    candidate_heap = []
+
+    sample_costs = np.zeros(N, dtype=int)
+
+    # Calculate nearest neighbors
+    nbrs = NearestNeighbors(n_neighbors=k+1).fit(X)
+    distances, indices = nbrs.kneighbors(X)
+
+    # Helper function to calculate label consistency
+    def label_consistency(sample_idx):
+        neighbor_labels = y[indices[sample_idx]]
+        consistency = (neighbor_labels * y[sample_idx]).sum(axis=1) / y[sample_idx].sum()
+        return (consistency >= consistency_threshold).mean()
+
+    # Initialize the heap with the initial scores and MLeNN criteria
+    for i in range(N):
+        sample_labels = y[i]
+        contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
+        consistency = label_consistency(i)
+
+        # Only consider samples with sufficient label consistency
+        if contribution > 0 and consistency >= consistency_threshold:
+            score = (contribution / (sample_costs[i] + 1)) * consistency
+            # Push negative score to simulate a max-heap
+            heapq.heappush(candidate_heap, (-score, i))
+
+    while np.any(current_label_counts < T):
+        if not candidate_heap:
+            break
+
+        # Select the best candidate
+        best_score, best_idx = heapq.heappop(candidate_heap)
+        best_score = -best_score  # Revert score back to positive
+
+        # Add the selected sample to the resampled dataset
+        X_resampled.append(X[best_idx])
+        y_resampled.append(y[best_idx])
+
+        # Update label counts and samples needed per label
+        current_label_counts += y[best_idx]
+        samples_needed_per_label = np.maximum(0, T - current_label_counts)
+        
+        # Track sample costs to avoid redundant resampling
+        sample_costs[best_idx] += 1
+        selected_samples.append(best_idx)
+
+        # Update the contribution and score for the selected sample
+        sample_labels = y[best_idx]
+        contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
+        consistency = label_consistency(best_idx)
+        
+        if contribution > 0 and consistency >= consistency_threshold:
+            score = (contribution / (sample_costs[best_idx] + 1)) * consistency
+            # Push updated score and index back to the heap
+            heapq.heappush(candidate_heap, (-score, best_idx))
+
+    X_resampled = np.array(X_resampled)
+    y_resampled = np.array(y_resampled)
+
+    X_resampled = np.concatenate((X, X_resampled), axis=0)
+    y_resampled = np.concatenate((y, y_resampled), axis=0)
+
+    return X_resampled, y_resampled

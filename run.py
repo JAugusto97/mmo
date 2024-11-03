@@ -4,23 +4,44 @@ import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from sklearn.ensemble import RandomForestClassifier
 from skmultilearn.problem_transform import LabelPowerset
-from skmultilearn.dataset import load_dataset
-from util import evaluate_multilabel, mmo, random_oversample, no_oversample, ml_smote
+from skmultilearn.dataset import load_dataset, available_data_sets
+
+from util import evaluate_multilabel, mmo, random_oversample, no_oversample, ml_smote, mle_nn, ml_ros, mmo_smote, mmo_mle_nn, label_density, mean_imbalance_ratio
 from sklearn.preprocessing import MinMaxScaler
 import time
 
 # Define random seeds for reproducibility
 random_seeds = [42, 24, 56, 78, 91, 35, 17, 83, 65, 12]
+
 datasets = [
-    'yeast', 'scene', 'emotions', 'birds', 'cal500',
-    'enron', 'mediamill', 'medical', 'tmc2007', 'chess', 'corel5k', 'corel16k'
+    'birds',
+    'medical',
+    'emotions',
+    'genbase',
+    'enron',
+    'scene',
+    'yeast',
+    'rcv1subset3',
+    'rcv1subset1',
+    'rcv1subset5',
+    'rcv1subset2',
+    'rcv1subset4',
+    'Corel5k',
+    'bibtex',
+    'delicious',
+    'tmc2007_500',
+    'mediamill'
 ]
 
 oversampling_methods = {
-    'mmo': mmo,
     'random': random_oversample,
     'none': no_oversample,
-    'ml_smote': ml_smote
+    'ml_smote': ml_smote,
+    'mle_nn': mle_nn,
+    'ml_ros': ml_ros,
+    'mmo': mmo,
+    'mmo_smote': mmo_smote,
+    'mmo_mle_nn': mmo_mle_nn
 }
 
 def process_dataset_with_seed(dataset_name, data, oversampling_methods, seed):
@@ -56,7 +77,12 @@ def process_dataset_with_seed(dataset_name, data, oversampling_methods, seed):
             'Classifier': "RandomForest",
             'Seed': seed,
             'Oversampling_Time_ms': (end_time_oversampling - start_time_oversampling) * 1000,
-            'Training_Time_ms': (end_time_training - start_time_training) * 1000
+            'Training_Time_ms': (end_time_training - start_time_training) * 1000,
+            'Train_Set_Increase': (X_resampled.shape[0] - X_train.shape[0]) / X_train.shape[0],
+            'Mean_Imbalance_Ratio_Before': mean_imbalance_ratio(y_train),
+            'Mean_Imbalance_Ratio_After': mean_imbalance_ratio(y_resampled),
+            'Label_Density_Before': label_density(y_train),
+            'Label_Density_After': label_density(y_resampled)
         }
         row.update(metrics)
         results.append(row)
@@ -69,7 +95,7 @@ def process_dataset_with_seed(dataset_name, data, oversampling_methods, seed):
 
 def run_experiment_parallel(data_dict, oversampling_methods, random_seeds):
     dataset_csv_paths = []
-    with ProcessPoolExecutor(max_workers=5) as executor:
+    with ProcessPoolExecutor(max_workers=4) as executor:
         futures = [
             executor.submit(process_dataset_with_seed, dataset_name, data, oversampling_methods, seed)
             for dataset_name, data in data_dict.items()
@@ -78,6 +104,20 @@ def run_experiment_parallel(data_dict, oversampling_methods, random_seeds):
 
         for future in as_completed(futures):
             dataset_csv_path = future.result()
+            dataset_csv_paths.append(dataset_csv_path)
+            print(f"Completed processing for {dataset_csv_path}.")
+
+    combined_results = pd.concat([pd.read_csv(path) for path in dataset_csv_paths])
+    combined_results.to_csv('datasets/consolidated_results.csv', index=False)
+    print("\nConsolidated results saved to 'consolidated_results.csv'.")
+    return combined_results
+
+def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
+    dataset_csv_paths = []
+    
+    for dataset_name, data in data_dict.items():
+        for seed in random_seeds:
+            dataset_csv_path = process_dataset_with_seed(dataset_name, data, oversampling_methods, seed)
             dataset_csv_paths.append(dataset_csv_path)
             print(f"Completed processing for {dataset_csv_path}.")
 
@@ -105,4 +145,4 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"Error loading {dataset} dataset: {e}")
             
-    results_df = run_experiment_parallel(data_dict, oversampling_methods, random_seeds)
+    results_df = run_experiment_sequential(data_dict, oversampling_methods, random_seeds)
