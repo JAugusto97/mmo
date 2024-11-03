@@ -46,6 +46,10 @@ oversampling_methods = {
 
 def process_dataset_with_seed(dataset_name, data, oversampling_methods, seed):
     dataset_csv_path = f"datasets/{dataset_name}_results_seed_{seed}.csv"
+
+    if os.path.exists(dataset_csv_path):
+        return dataset_csv_path
+    
     results = []
     X_train = np.asarray(data['X_train'].todense())
     y_train = np.asarray(data['y_train'].todense())
@@ -117,9 +121,13 @@ def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
     
     for dataset_name, data in data_dict.items():
         for seed in random_seeds:
-            dataset_csv_path = process_dataset_with_seed(dataset_name, data, oversampling_methods, seed)
-            dataset_csv_paths.append(dataset_csv_path)
-            print(f"Completed processing for {dataset_csv_path}.")
+            try:
+                dataset_csv_path = process_dataset_with_seed(dataset_name, data, oversampling_methods, seed)
+                dataset_csv_paths.append(dataset_csv_path)
+                print(f"Completed processing for {dataset_csv_path}.")
+
+            except Exception as e:
+                print(f"Error processing {dataset_name} with seed {seed}: {e}")
 
     combined_results = pd.concat([pd.read_csv(path) for path in dataset_csv_paths])
     combined_results.to_csv('datasets/consolidated_results.csv', index=False)

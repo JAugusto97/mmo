@@ -44,7 +44,7 @@ def mean_imbalance_ratio(y):
     n_samples, n_labels = y.shape
     label_frequencies = np.sum(y, axis=0)
     max_frequency = np.max(label_frequencies)
-    imbalance_ratios = max_frequency / label_frequencies
+    imbalance_ratios = max_frequency / (label_frequencies + 1e-6)
     mean_ir = np.mean(imbalance_ratios)
     return mean_ir
 
@@ -54,8 +54,12 @@ def evaluate_multilabel(y_test, y_pred):
     accuracy = accuracy_score(y_test, y_pred)
     f1_micro = f1_score(y_test, y_pred, average='micro', zero_division=0)
     f1_macro = f1_score(y_test, y_pred, average='macro', zero_division=0)
-    auc_roc = roc_auc_score(y_test, y_pred, average='macro', multi_class="ovr")
-    auc_pr = average_precision_score(y_test, y_pred, average='macro')
+    
+    try:
+        roc_auc = roc_auc_score(y_test, y_pred, average='macro', multi_class='ovr')
+    except ValueError:
+        roc_auc = 0.0
+
     precision, recall, f1_per_label, _ = precision_recall_fscore_support(y_test, y_pred, average=None, zero_division=0)
     fmeasure = f1_per_label.mean()
     
@@ -64,8 +68,7 @@ def evaluate_multilabel(y_test, y_pred):
         'Accuracy': accuracy,
         'F1 Micro': f1_micro,
         'F1 Macro': f1_macro,
-        'AUC-ROC': auc_roc,
-        'AUC-PR': auc_pr,
+        'AUC-ROC': roc_auc,
         'F-measure': fmeasure
     }
 
@@ -214,7 +217,7 @@ def ml_smote(X, y, k=3, n_samples=100):
         # Identify samples for the current label
         minority_indices = np.where(y[:, label_idx] == 1)[0]
         
-        if len(minority_indices) < 2:
+        if len(minority_indices) < k + 1:
             # Skip if there's too few minority samples to apply SMOTE
             continue
         
@@ -314,28 +317,31 @@ def ml_ros(X, y, target_proportion=1.0):
     # Calculate label frequencies
     label_counts = np.sum(y, axis=0)
     max_count = np.max(label_counts)
-    target_counts = (target_proportion * max_count).astype(int)
+    target_counts = (target_proportion * max_count).round().astype(int) * np.ones_like(label_counts)
 
     # Initialize resampled data
     X_resampled, y_resampled = list(X), list(y)
 
     for label_idx in range(y.shape[1]):
-        if label_counts[label_idx] < target_counts:
+        if label_counts[label_idx] < target_counts[label_idx]:
             # Find instances with this label
             minority_indices = np.where(y[:, label_idx] == 1)[0]
             # Determine the number of samples needed
-            num_samples_needed = target_counts - label_counts[label_idx]
-            # Randomly sample with replacement
-            samples_to_add = resample(
-                minority_indices,
-                n_samples=num_samples_needed,
-                replace=True,
-                random_state=42
-            )
-            # Add resampled instances to the data
-            for idx in samples_to_add:
-                X_resampled.append(X[idx])
-                y_resampled.append(y[idx])
+            num_samples_needed = target_counts[label_idx] - label_counts[label_idx]
+            
+            # Only proceed if there are samples needed and available indices to sample from
+            if num_samples_needed > 0 and len(minority_indices) > 0:
+                # Randomly sample with replacement
+                samples_to_add = resample(
+                    minority_indices,
+                    n_samples=num_samples_needed,
+                    replace=True,
+                    random_state=42
+                )
+                # Add resampled instances to the data
+                for idx in samples_to_add:
+                    X_resampled.append(X[idx])
+                    y_resampled.append(y[idx])
 
     return np.array(X_resampled), np.array(y_resampled)
 
@@ -440,8 +446,8 @@ def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5):
     # Helper function to calculate label consistency
     def label_consistency(sample_idx):
         neighbor_labels = y[indices[sample_idx]]
-        consistency = (neighbor_labels * y[sample_idx]).sum(axis=1) / y[sample_idx].sum()
-        return (consistency >= consistency_threshold).mean()
+        consistency = (neighbor_labels * y[sample_idx]).sum(axis=1) / (y[sample_idx].sum() + 1)
+        return (consistency > consistency_threshold).mean()
 
     # Initialize the heap with the initial scores and MLeNN criteria
     for i in range(N):
