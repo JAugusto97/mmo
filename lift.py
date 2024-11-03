@@ -1,6 +1,6 @@
 """
-Credits to the authors of the paper: "An oversampling algorithm of multi-label data based on
-cluster-specific samples and fuzzy rough set theory"
+Credits to the authors of the paper: "Multi-label learning with Relief-based label-specific
+feature selection" (https://doi.org/10.1007/s10489-022-04350-1)
 
 This code was only slighly modified. The original code can be found at: https://data.mendeley.com/datasets/dj4crhrp4w/1.
 """
