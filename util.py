@@ -65,9 +65,9 @@ def evaluate_multilabel(y_test, y_pred):
     return {
         "Hamming Loss": hamming,
         "Accuracy": accuracy,
+        "AUC-ROC": roc_auc,
         "F1 Micro": f1_micro,
         "F1 Macro": f1_macro,
-        "AUC-ROC": roc_auc,
     }
 
 
