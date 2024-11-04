@@ -53,10 +53,15 @@ def evaluate_multilabel(y_test, y_pred):
     f1_micro = f1_score(y_test, y_pred, average="micro", zero_division=0)
     f1_macro = f1_score(y_test, y_pred, average="macro", zero_division=0)
 
-    try:
-        roc_auc = roc_auc_score(y_test, y_pred, average="macro", multi_class="ovr")
-    except ValueError:
-        roc_auc = 0.0
+    roc_aucs = []
+    for i in range(y_test.shape[1]):
+        try:
+            roc_auc = roc_auc_score(y_test[:, i], y_pred[:, i])
+            roc_aucs.append(roc_auc)
+        except ValueError:
+            roc_aucs.append(0.0)
+
+    roc_auc = np.mean(roc_aucs)
 
     precision, recall, f1_per_label, _ = precision_recall_fscore_support(
         y_test, y_pred, average=None, zero_division=0
@@ -71,13 +76,13 @@ def evaluate_multilabel(y_test, y_pred):
     }
 
 
-def mmo(X, y, **kwargs):
+def mmo(X, y, target_proportion=1.0, **kwargs):
     selected_samples = []
     N, num_features = X.shape
     _, M = y.shape
 
     current_label_counts = np.sum(y, axis=0)
-    T = np.max(current_label_counts)
+    T = np.max(current_label_counts) * target_proportion
     samples_needed_per_label = T - current_label_counts
 
     # List-based approach for resampled data
@@ -139,7 +144,7 @@ def no_oversample(X, y, **kwargs):
     return X, y
 
 
-def ml_smote(X, y, k=3, **kwargs):
+def ml_smote(X, y, target_proportion=1.0, k=3, **kwargs):
     """
     Apply multilabel SMOTE to generate synthetic samples for a multilabel dataset to achieve balanced classes.
 
@@ -161,7 +166,7 @@ def ml_smote(X, y, k=3, **kwargs):
 
     # Determine the number of samples needed for each label to achieve balance
     label_counts = np.sum(y, axis=0)
-    max_count = np.max(label_counts)
+    max_count = np.max(label_counts) * target_proportion
     samples_needed_per_label = max_count - label_counts
 
     for label_idx in range(y.shape[1]):
@@ -218,7 +223,7 @@ def ml_ros(X, y, random_state=None, target_proportion=1.0, **kwargs):
     """
     # Calculate label frequencies
     label_counts = np.sum(y, axis=0)
-    max_count = np.max(label_counts)
+    max_count = np.max(label_counts) * target_proportion
     target_counts = (target_proportion * max_count).round().astype(int) * np.ones_like(
         label_counts
     )
@@ -323,6 +328,74 @@ def mmo_smote(X, y, k=3, **kwargs):
     y_resampled = np.array(y_resampled)
 
     # Concatenate the original dataset with the synthetic samples
+    X_resampled = np.concatenate((X, X_resampled), axis=0)
+    y_resampled = np.concatenate((y, y_resampled), axis=0)
+
+    return X_resampled, y_resampled
+
+
+def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5, **kwargs):
+    selected_samples = []
+    N, num_features = X.shape
+    _, M = y.shape
+
+    current_label_counts = np.sum(y, axis=0)
+    T = np.max(current_label_counts)
+    samples_needed_per_label = T - current_label_counts
+
+    X_resampled = []
+    y_resampled = []
+
+    candidate_heap = []
+
+    sample_costs = np.zeros(N, dtype=int)
+
+    nbrs = NearestNeighbors(n_neighbors=k + 1).fit(X)
+    distances, indices = nbrs.kneighbors(X)
+
+    def label_consistency(sample_idx):
+        neighbor_labels = y[indices[sample_idx]]
+        consistency = (neighbor_labels * y[sample_idx]).sum(axis=1) / (
+            y[sample_idx].sum() + 1
+        )
+        return (consistency > consistency_threshold).mean()
+
+    for i in range(N):
+        sample_labels = y[i]
+        contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
+        consistency = label_consistency(i)
+
+        if contribution > 0 and consistency >= consistency_threshold:
+            score = (contribution / (sample_costs[i] + 1)) * consistency
+            heapq.heappush(candidate_heap, (-score, i))
+
+    while np.any(current_label_counts < T):
+        if not candidate_heap:
+            break
+
+        best_score, best_idx = heapq.heappop(candidate_heap)
+        best_score = -best_score
+
+        X_resampled.append(X[best_idx])
+        y_resampled.append(y[best_idx])
+
+        current_label_counts += y[best_idx]
+        samples_needed_per_label = np.maximum(0, T - current_label_counts)
+
+        sample_costs[best_idx] += 1
+        selected_samples.append(best_idx)
+
+        sample_labels = y[best_idx]
+        contribution = np.minimum(samples_needed_per_label, sample_labels).sum()
+        consistency = label_consistency(best_idx)
+
+        if contribution > 0 and consistency >= consistency_threshold:
+            score = (contribution / (sample_costs[best_idx] + 1)) * consistency
+            heapq.heappush(candidate_heap, (-score, best_idx))
+
+    X_resampled = np.array(X_resampled)
+    y_resampled = np.array(y_resampled)
+
     X_resampled = np.concatenate((X, X_resampled), axis=0)
     y_resampled = np.concatenate((y, y_resampled), axis=0)
 

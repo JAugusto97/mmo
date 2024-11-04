@@ -17,6 +17,7 @@ from util import (
     ml_smote,
     ml_ros,
     mmo_smote,
+    mmo_mle_nn,
     label_density,
     mean_imbalance_ratio,
 )
@@ -58,6 +59,7 @@ oversampling_methods = {
     "lift": lift,
     "mlsol": mlsol,
     "remedial": remedial,
+    "mmo_mle_nn": mmo_mle_nn,
 }
 
 
