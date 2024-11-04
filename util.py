@@ -91,13 +91,13 @@ def evaluate_multilabel(y_test, y_pred):
     }
 
 
-def mmo(X, y, target_proportion=1.0, **kwargs):
+def mmo(X, y, target_proportion=1, **kwargs):
     selected_samples = []
     N, num_features = X.shape
     _, M = y.shape
 
     current_label_counts = np.sum(y, axis=0)
-    T = np.max(current_label_counts) * target_proportion
+    T = np.max(current_label_counts) * int(target_proportion)
     samples_needed_per_label = T - current_label_counts
 
     # List-based approach for resampled data
@@ -159,7 +159,7 @@ def no_oversample(X, y, **kwargs):
     return X, y, []
 
 
-def ml_smote(X, y, target_proportion=1.0, k=3, **kwargs):
+def ml_smote(X, y, target_proportion=1, k=3, **kwargs):
     """
     Apply multilabel SMOTE to generate synthetic samples for a multilabel dataset to achieve balanced classes.
 
@@ -182,7 +182,7 @@ def ml_smote(X, y, target_proportion=1.0, k=3, **kwargs):
 
     # Determine the number of samples needed for each label to achieve balance
     label_counts = np.sum(y, axis=0)
-    max_count = np.max(label_counts) * target_proportion
+    max_count = np.max(label_counts) * int(target_proportion)
     samples_needed_per_label = max_count - label_counts
 
     for label_idx in range(y.shape[1]):
@@ -221,7 +221,7 @@ def ml_smote(X, y, target_proportion=1.0, k=3, **kwargs):
     return np.array(X_resampled), np.array(y_resampled), selected_samples
 
 
-def ml_ros(X, y, random_state=None, target_proportion=1.0, **kwargs):
+def ml_ros(X, y, random_state=None, target_proportion=1, **kwargs):
     """
     Apply Multi-Label Random Over-Sampling (ML-ROS) to balance a multilabel dataset.
 
@@ -242,7 +242,7 @@ def ml_ros(X, y, random_state=None, target_proportion=1.0, **kwargs):
     selected_samples = []
     # Calculate label frequencies
     label_counts = np.sum(y, axis=0)
-    max_count = np.max(label_counts) * target_proportion
+    max_count = np.max(label_counts) * int(target_proportion)
     target_counts = (target_proportion * max_count).round().astype(int) * np.ones_like(
         label_counts
     )
