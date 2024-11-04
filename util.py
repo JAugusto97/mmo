@@ -11,6 +11,21 @@ from sklearn.metrics import (
     precision_recall_fscore_support,
 )
 from sklearn.neighbors import NearestNeighbors
+from collections import Counter
+
+
+def normalized_shannon_entropy(indices):
+    counts = Counter(indices)
+
+    total = len(indices)
+    probabilities = np.array(list(counts.values())) / total
+
+    entropy = -np.sum(probabilities * np.log2(probabilities))
+
+    max_entropy = np.log2(total) if total > 1 else 1
+
+    normalized_entropy = np.abs(entropy / max_entropy)
+    return float(normalized_entropy)
 
 
 def label_density(y):
@@ -137,11 +152,11 @@ def mmo(X, y, target_proportion=1.0, **kwargs):
     X_resampled = np.concatenate((X, X_resampled), axis=0)
     y_resampled = np.concatenate((y, y_resampled), axis=0)
 
-    return X_resampled, y_resampled
+    return X_resampled, y_resampled, selected_samples
 
 
 def no_oversample(X, y, **kwargs):
-    return X, y
+    return X, y, []
 
 
 def ml_smote(X, y, target_proportion=1.0, k=3, **kwargs):
@@ -162,6 +177,7 @@ def ml_smote(X, y, target_proportion=1.0, k=3, **kwargs):
     y_resampled : np.ndarray
         The resampled target matrix including synthetic samples.
     """
+    selected_samples = []
     X_resampled, y_resampled = list(X), list(y)
 
     # Determine the number of samples needed for each label to achieve balance
@@ -200,7 +216,9 @@ def ml_smote(X, y, target_proportion=1.0, k=3, **kwargs):
             X_resampled.append(X_synthetic)
             y_resampled.append(y[minority_indices[idx]])
 
-    return np.array(X_resampled), np.array(y_resampled)
+            selected_samples.append(minority_indices[idx])
+
+    return np.array(X_resampled), np.array(y_resampled), selected_samples
 
 
 def ml_ros(X, y, random_state=None, target_proportion=1.0, **kwargs):
@@ -221,6 +239,7 @@ def ml_ros(X, y, random_state=None, target_proportion=1.0, **kwargs):
     y_resampled : np.ndarray
         The resampled target matrix after applying ML-ROS.
     """
+    selected_samples = []
     # Calculate label frequencies
     label_counts = np.sum(y, axis=0)
     max_count = np.max(label_counts) * target_proportion
@@ -252,7 +271,9 @@ def ml_ros(X, y, random_state=None, target_proportion=1.0, **kwargs):
                     X_resampled.append(X[idx])
                     y_resampled.append(y[idx])
 
-    return np.array(X_resampled), np.array(y_resampled)
+                    selected_samples.append(idx)
+
+    return np.array(X_resampled), np.array(y_resampled), selected_samples
 
 
 def mmo_smote(X, y, k=3, **kwargs):
@@ -331,7 +352,7 @@ def mmo_smote(X, y, k=3, **kwargs):
     X_resampled = np.concatenate((X, X_resampled), axis=0)
     y_resampled = np.concatenate((y, y_resampled), axis=0)
 
-    return X_resampled, y_resampled
+    return X_resampled, y_resampled, selected_samples
 
 
 def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5, **kwargs):
@@ -399,4 +420,4 @@ def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5, **kwargs):
     X_resampled = np.concatenate((X, X_resampled), axis=0)
     y_resampled = np.concatenate((y, y_resampled), axis=0)
 
-    return X_resampled, y_resampled
+    return X_resampled, y_resampled, selected_samples

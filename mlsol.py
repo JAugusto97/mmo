@@ -150,7 +150,7 @@ class MLSOL:
         return x_synthetic, y_synthetic
 
     def fit_resample(self, X, y):
-
+        selected_samples = []
         # find every label's minority class
         min_class_per_label = self.get_min_class_per_label(y)
 
@@ -177,6 +177,7 @@ class MLSOL:
         for i in range(gen_num):
             # select a seed instance from your initial dataset based on the weights vector w
             seed_index = self.get_seed_instance(w)
+            selected_samples.append(seed_index)
             # randomly choose a reference instance from the k nearest neighbours of the seed instance
             reference_index = indices[seed_index][random.randint(1, self.k)]
             # i am adding the synthesized samples in reverse inside the dataset
@@ -197,25 +198,11 @@ class MLSOL:
         X_aug = np.concatenate((X, np.flip(X_synthesized, axis=0)), 0)
         y_aug = np.concatenate((y, np.flip(y_synthesized, axis=0)), 0)
 
-        return X_aug, y_aug
-
-        """
-        X, Y = make_multilabel_classification(n_samples=500, n_classes=25, n_labels=3,
-                                              allow_unlabeled=False,
-                                              random_state=1)
-
-        for i in range(Y.shape[1]):
-            if sum(Y[:, i]) == 0:
-                print(str(i))
-
-        mlsol = MLSOL(perc_gen_instances=0.3, k=5)
-
-        X_aug, y_aug = mlsol.fit_resample(X, Y)
-        """
+        return X_aug, y_aug, selected_samples
 
 
 def mlsol(X, y, **kwargs):
     mlsol = MLSOL(perc_gen_instances=1, k=3)
-    X_aug, y_aug = mlsol.fit_resample(X, y)
+    X_aug, y_aug, selected_samples = mlsol.fit_resample(X, y)
 
-    return X_aug, y_aug
+    return X_aug, y_aug, selected_samples

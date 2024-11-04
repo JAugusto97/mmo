@@ -20,6 +20,7 @@ from util import (
     mmo_mle_nn,
     label_density,
     mean_imbalance_ratio,
+    normalized_shannon_entropy,
 )
 from lift import lift
 from mlsol import mlsol
@@ -66,9 +67,7 @@ oversampling_methods = {
 def process_dataset_with_seed(
     classifier_name, classifier, dataset_name, data, oversampling_methods, seed
 ):
-    dataset_csv_path = (
-        f"datasets/{dataset_name}_{classifier_name}_seed_{seed}.csv"
-    )
+    dataset_csv_path = f"datasets/{dataset_name}_{classifier_name}_seed_{seed}.csv"
 
     if os.path.exists(dataset_csv_path):
         return dataset_csv_path
@@ -91,7 +90,9 @@ def process_dataset_with_seed(
         start_time_oversampling = time.time()
 
         kwargs = {"random_state": seed}
-        X_resampled, y_resampled = oversample_func(X_train, y_train, **kwargs)
+        X_resampled, y_resampled, selected_samples = oversample_func(
+            X_train, y_train, **kwargs
+        )
         end_time_oversampling = time.time()
 
         print(
@@ -118,6 +119,7 @@ def process_dataset_with_seed(
             "Mean_Imbalance_Ratio_After": mean_imbalance_ratio(y_resampled),
             "Label_Density_Before": label_density(y_train),
             "Label_Density_After": label_density(y_resampled),
+            "Normalized_Shannon_Entropy": normalized_shannon_entropy(selected_samples),
         }
         row.update(metrics)
         results.append(row)
@@ -167,18 +169,18 @@ def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run multilabel oversampling experiment.")
+    parser = argparse.ArgumentParser(
+        description="Run multilabel oversampling experiment."
+    )
     parser.add_argument(
         "--dataset",
         type=str,
         default="all",
-        help="Specify the dataset to process. Use 'all' to process all datasets."
+        help="Specify the dataset to process. Use 'all' to process all datasets.",
     )
     args = parser.parse_args()
 
-    selected_datasets = (
-        datasets if args.dataset == "all" else [args.dataset]
-    )
+    selected_datasets = datasets if args.dataset == "all" else [args.dataset]
 
     data_dict = {}
     for dataset in datasets:

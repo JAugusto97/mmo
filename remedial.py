@@ -25,6 +25,7 @@ class REMEDIAL:
 
     def fit_transform(self, X, y):
         """Apply the REMEDIAL algorithm to the dataset X, y."""
+        selected_samples = []
         self.label_frequencies = self._calculate_label_frequencies(y)
         self.minority_threshold = np.percentile(
             list(self.label_frequencies.values()), 25
@@ -52,11 +53,12 @@ class REMEDIAL:
                     padded_labels = np.zeros(num_labels)
                     padded_labels[: len(modified_labels)] = modified_labels
                     new_instances.append((instance, padded_labels))
+                    selected_samples.append(i)
 
         X_augmented = np.vstack([X] + [inst[0] for inst in new_instances])
         y_augmented = np.vstack([y] + [inst[1] for inst in new_instances])
 
-        return X_augmented, y_augmented
+        return X_augmented, y_augmented, selected_samples
 
     def _modify_instance(self, instance, labels):
         """Generate modified instances by decoupling labels."""
@@ -81,6 +83,6 @@ class REMEDIAL:
 
 
 def remedial(X, y, **kwargs):
-    remedial = REMEDIAL(0.1)
-    X_augmented, y_augmented = remedial.fit_transform(X, y)
-    return X_augmented, y_augmented
+    remedial = REMEDIAL(0.2)
+    X_augmented, y_augmented, selected_samples = remedial.fit_transform(X, y)
+    return X_augmented, y_augmented, selected_samples

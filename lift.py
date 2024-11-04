@@ -11,6 +11,8 @@ from sklearn.cluster import MiniBatchKMeans
 from sklearn.linear_model import SGDClassifier
 from sklearn.cluster import KMeans
 from collections import Counter
+from sklearn.neighbors import NearestNeighbors
+
 
 import math
 import random
@@ -224,7 +226,6 @@ def LIFT_WEIGHT(X, Y, ratio):
     :param ratio:
     :return:
     """
-
     sample_total_weight = np.zeros((X.shape[0], Y.shape[1]))  # n * q
     label_ir = []
     label_ir_max = []
@@ -319,7 +320,7 @@ def get_seed_instance(w):
 
 
 def lift(X, Y, r=0.2, K=3, perc_gen_instances=1, **kwargs):
-
+    selected_samples = []
     sample_total_weight, label_cluster_matrix = LIFT_WEIGHT(X, Y, r)
     min_w = []
     X_min = []
@@ -332,7 +333,6 @@ def lift(X, Y, r=0.2, K=3, perc_gen_instances=1, **kwargs):
             Y_min.append(Y[i])
 
     Kn = K
-    from sklearn.neighbors import NearestNeighbors
 
     nbrs = NearestNeighbors(
         n_neighbors=Kn + 1, algorithm="brute", metric="euclidean"
@@ -349,6 +349,8 @@ def lift(X, Y, r=0.2, K=3, perc_gen_instances=1, **kwargs):
     synset = set()
     for i in range(0, gen_num):
         seed_index = get_seed_instance(sample_total_weight)
+
+        selected_samples.append(seed_index)
 
         x_seed = X[seed_index]
         y_seed = Y[seed_index]
@@ -381,7 +383,7 @@ def lift(X, Y, r=0.2, K=3, perc_gen_instances=1, **kwargs):
         y_synthetic = y_seed
         dist_seed = np.linalg.norm(x_synthetic - x_seed)
         dist_reference = np.linalg.norm(x_synthetic - x_reference)
-        cd = dist_seed / (dist_reference)
+        cd = dist_seed / (dist_reference + 0.0001)
         if cd > 1:
             y_synthetic = Y[reference_index]
 
@@ -390,4 +392,4 @@ def lift(X, Y, r=0.2, K=3, perc_gen_instances=1, **kwargs):
 
         X_syn.append(x_synthetic)
 
-    return np.asarray(X_mlsmote), np.asarray(Y_mlsmote)
+    return np.asarray(X_mlsmote), np.asarray(Y_mlsmote), selected_samples
