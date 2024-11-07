@@ -14,6 +14,68 @@ from sklearn.neighbors import NearestNeighbors
 from collections import Counter
 
 
+class FeatureSelectorByFrequency:
+    """
+    A feature selector class that selects the top N% of features based on
+    the frequency of non-zero values in a dataset.
+    """
+
+    def __init__(self, percentage):
+        """
+        Initializes the selector with the percentage of top features to retain.
+
+        Parameters:
+        - percentage: The percentage of top features to retain (e.g., 0.1 for 10%).
+        """
+        self.percentage = percentage
+        self.selected_features_indices = None
+
+    def fit(self, X):
+        """
+        Fits the selector to the dataset by determining the top features.
+
+        Parameters:
+        - X: A NumPy array where rows are samples/documents and columns are features/terms.
+        """
+        feature_nonzero_counts = np.count_nonzero(X, axis=0)
+
+        num_features_to_select = int(np.ceil(self.percentage * X.shape[1]))
+
+        self.selected_features_indices = np.argsort(feature_nonzero_counts)[
+            -num_features_to_select:
+        ]
+        self.selected_features_indices = np.sort(self.selected_features_indices)
+
+    def transform(self, X):
+        """
+        Transforms the dataset by selecting the features identified during fitting.
+
+        Parameters:
+        - X: A NumPy array with the same number of features as the dataset used in `fit`.
+
+        Returns:
+        - X_reduced: The dataset containing only the selected features.
+        """
+        if self.selected_features_indices is None:
+            raise ValueError("The selector has not been fitted yet. Call fit() first.")
+
+        X_reduced = X[:, self.selected_features_indices]
+        return X_reduced
+
+    def fit_transform(self, X):
+        """
+        Fits the selector and transforms the dataset in a single step.
+
+        Parameters:
+        - X: A NumPy array where rows are samples/documents and columns are features/terms.
+
+        Returns:
+        - X_reduced: The dataset containing only the selected features.
+        """
+        self.fit(X)
+        return self.transform(X)
+
+
 def normalized_shannon_entropy(indices):
     counts = Counter(indices)
 
@@ -159,7 +221,7 @@ def no_oversample(X, y, **kwargs):
     return X, y, []
 
 
-def ml_smote(X, y, target_proportion=1, k=3, **kwargs):
+def ml_smote(X, y, target_proportion=1, k=5, **kwargs):
     """
     Apply multilabel SMOTE to generate synthetic samples for a multilabel dataset to achieve balanced classes.
 
@@ -276,7 +338,7 @@ def ml_ros(X, y, random_state=None, target_proportion=1, **kwargs):
     return np.array(X_resampled), np.array(y_resampled), selected_samples
 
 
-def mmo_smote(X, y, k=3, **kwargs):
+def mmo_smote(X, y, k=5, **kwargs):
     selected_samples = []
     N, num_features = X.shape
     _, M = y.shape
@@ -355,7 +417,7 @@ def mmo_smote(X, y, k=3, **kwargs):
     return X_resampled, y_resampled, selected_samples
 
 
-def mmo_mle_nn(X, y, k=3, consistency_threshold=0.5, **kwargs):
+def mmo_mle_nn(X, y, k=5, consistency_threshold=0.3, **kwargs):
     selected_samples = []
     N, num_features = X.shape
     _, M = y.shape

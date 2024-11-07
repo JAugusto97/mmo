@@ -21,6 +21,7 @@ from util import (
     label_density,
     mean_imbalance_ratio,
     normalized_shannon_entropy,
+    FeatureSelectorByFrequency,
 )
 from lift import lift
 from mlsol import mlsol
@@ -29,7 +30,7 @@ from sklearn.preprocessing import MinMaxScaler
 import time
 
 # Define random seeds for reproducibility
-random_seeds = list(range(1, 11))
+random_seeds = list(range(1, 21))
 
 datasets = [
     "birds",
@@ -49,6 +50,19 @@ datasets = [
     "delicious",
     "tmc2007_500",
     "mediamill",
+]
+
+large_datasets = [
+    "rcv1subset1",
+    "rcv1subset2",
+    "rcv1subset3",
+    "rcv1subset4",
+    "rcv1subset5",
+    "delicious",
+    "tmc2007_500",
+    "mediamill",
+    "bibtex",
+    "enron",
 ]
 
 oversampling_methods = {
@@ -134,6 +148,10 @@ def process_dataset_with_seed(
 def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
     dataset_csv_paths = []
     for dataset_name, data in data_dict.items():
+        if dataset_name in large_datasets:
+            fs = FeatureSelectorByFrequency(0.10)
+            data["X_train"] = fs.fit_transform(data["X_train"])
+            data["X_test"] = fs.transform(data["X_test"])
         for seed in random_seeds:
             classifier_dict = {
                 "BR-RF": BinaryRelevance(

@@ -319,7 +319,7 @@ def get_seed_instance(w):
     return seed_index
 
 
-def lift(X, Y, r=0.2, K=3, perc_gen_instances=1, **kwargs):
+def lift(X, Y, r=0.2, K=5, perc_gen_instances=1, **kwargs):
     selected_samples = []
     sample_total_weight, label_cluster_matrix = LIFT_WEIGHT(X, Y, r)
     min_w = []

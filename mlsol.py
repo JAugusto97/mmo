@@ -202,7 +202,7 @@ class MLSOL:
 
 
 def mlsol(X, y, **kwargs):
-    mlsol = MLSOL(perc_gen_instances=1, k=3)
+    mlsol = MLSOL(perc_gen_instances=1, k=5)
     X_aug, y_aug, selected_samples = mlsol.fit_resample(X, y)
 
     return X_aug, y_aug, selected_samples
