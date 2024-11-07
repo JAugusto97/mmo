@@ -58,9 +58,6 @@ large_datasets = [
     "rcv1subset3",
     "rcv1subset4",
     "rcv1subset5",
-    "delicious",
-    "tmc2007_500",
-    "mediamill",
     "bibtex",
     "enron",
 ]
@@ -78,9 +75,7 @@ oversampling_methods = {
 }
 
 
-def process_dataset_with_seed(
-    classifier_name, classifier, dataset_name, data, oversampling_methods, seed
-):
+def process_dataset_with_seed(classifier_name, classifier, dataset_name, data, oversampling_methods, seed):
     dataset_csv_path = f"datasets/{dataset_name}_{classifier_name}_seed_{seed}.csv"
 
     if os.path.exists(dataset_csv_path):
@@ -94,24 +89,23 @@ def process_dataset_with_seed(
     np.random.seed(seed)
 
     scaler = MinMaxScaler()
+    if dataset_name in large_datasets:
+        fs = FeatureSelectorByFrequency(0.10)
+        X_train = fs.fit_transform(X_train)
+        X_test = fs.transform(X_test)
+
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
     for oversample_name, oversample_func in oversampling_methods.items():
-        print(
-            f"Applying {oversample_name} oversampling for {dataset_name} with seed {seed}."
-        )
+        print(f"Applying {oversample_name} oversampling for {dataset_name} with seed {seed}.")
         start_time_oversampling = time.time()
 
         kwargs = {"random_state": seed}
-        X_resampled, y_resampled, selected_samples = oversample_func(
-            X_train, y_train, **kwargs
-        )
+        X_resampled, y_resampled, selected_samples = oversample_func(X_train, y_train, **kwargs)
         end_time_oversampling = time.time()
 
-        print(
-            f"Training {classifier_name} for {dataset_name} with oversampling {oversample_name} with seed {seed}."
-        )
+        print(f"Training {classifier_name} for {dataset_name} with oversampling {oversample_name} with seed {seed}.")
         start_time_training = time.time()
         classifier.fit(X_resampled, y_resampled)
         end_time_training = time.time()
@@ -124,11 +118,9 @@ def process_dataset_with_seed(
             "Oversampling": oversample_name,
             "Classifier": classifier_name,
             "Seed": seed,
-            "Oversampling_Time_ms": (end_time_oversampling - start_time_oversampling)
-            * 1000,
+            "Oversampling_Time_ms": (end_time_oversampling - start_time_oversampling) * 1000,
             "Training_Time_ms": (end_time_training - start_time_training) * 1000,
-            "Train_Set_Increase": (X_resampled.shape[0] - X_train.shape[0])
-            / X_train.shape[0],
+            "Train_Set_Increase": (X_resampled.shape[0] - X_train.shape[0]) / X_train.shape[0],
             "Mean_Imbalance_Ratio_Before": mean_imbalance_ratio(y_train),
             "Mean_Imbalance_Ratio_After": mean_imbalance_ratio(y_resampled),
             "Label_Density_Before": label_density(y_train),
@@ -148,21 +140,11 @@ def process_dataset_with_seed(
 def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
     dataset_csv_paths = []
     for dataset_name, data in data_dict.items():
-        if dataset_name in large_datasets:
-            fs = FeatureSelectorByFrequency(0.10)
-            data["X_train"] = fs.fit_transform(data["X_train"])
-            data["X_test"] = fs.transform(data["X_test"])
         for seed in random_seeds:
             classifier_dict = {
-                "BR-RF": BinaryRelevance(
-                    RandomForestClassifier(n_estimators=100, random_state=seed)
-                ),
-                "CC-RF": ClassifierChain(
-                    RandomForestClassifier(n_estimators=100, random_state=seed)
-                ),
-                "LP-RF": LabelPowerset(
-                    RandomForestClassifier(n_estimators=100, random_state=seed)
-                ),
+                "BR-RF": BinaryRelevance(RandomForestClassifier(n_estimators=100, random_state=seed)),
+                "CC-RF": ClassifierChain(RandomForestClassifier(n_estimators=100, random_state=seed)),
+                "LP-RF": LabelPowerset(RandomForestClassifier(n_estimators=100, random_state=seed)),
             }
             for classifier_name, classifier in classifier_dict.items():
                 try:
@@ -187,9 +169,7 @@ def run_experiment_sequential(data_dict, oversampling_methods, random_seeds):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run multilabel oversampling experiment."
-    )
+    parser = argparse.ArgumentParser(description="Run multilabel oversampling experiment.")
     parser.add_argument(
         "--dataset",
         type=str,
@@ -216,6 +196,4 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error loading {dataset} dataset: {e}")
 
-    results_df = run_experiment_sequential(
-        data_dict, oversampling_methods, random_seeds
-    )
+    results_df = run_experiment_sequential(data_dict, oversampling_methods, random_seeds)
